@@ -26,7 +26,8 @@
             "assets": ["src/favicon.ico", "src/assets"],
             "styles": [
               "src/styles.scss",
-              "./node_modules/maplibre-gl/dist/maplibre-gl.css"
+              "./node_modules/maplibre-gl/dist/maplibre-gl.css",
+              "@mapbox/mapbox-gl-draw/dist/mapbox-gl-draw.css"
             ],
             "scripts": []
           },
@@ -82,10 +83,7 @@
             "tsConfig": "tsconfig.spec.json",
             "inlineStyleLanguage": "scss",
             "assets": ["src/favicon.ico", "src/assets"],
-            "styles": [
-              "src/styles.scss",
-              "./node_modules/maplibre-gl/dist/maplibre-gl.css"
-            ],
+            "styles": ["src/styles.scss"],
             "scripts": []
           }
         }

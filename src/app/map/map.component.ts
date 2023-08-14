@@ -6,8 +6,11 @@ import {
   AfterViewInit,
   OnDestroy,
 } from '@angular/core';
-import { Map, NavigationControl, Marker } from 'maplibre-gl';
+import { Map, NavigationControl, Marker } from 'mapbox-gl';
+import mapboxgl from 'mapbox-gl';
 import { HttpClient } from '@angular/common/http';
+import * as turf from '@turf/turf';
+import * as MapboxDraw from '@mapbox/mapbox-gl-draw';
 
 @Component({
   selector: 'app-map',
@@ -16,8 +19,11 @@ import { HttpClient } from '@angular/common/http';
 })
 export class MapComponent implements OnInit, AfterViewInit {
   @ViewChild('mapContainer') mapContainer!: ElementRef;
-  map: Map | undefined;
-  data: any = {};
+  map: mapboxgl.Map | undefined;
+  draw: any;
+  selectedFeatures: turf.AllGeoJSON = turf.featureCollection([]);
+
+  selectedArea: number | null = null;
 
   mapStyle =
     'https://api.maptiler.com/maps/satellite/style.json?key=meIz87U0Ci2zKW6N0Saq';
@@ -29,26 +35,30 @@ export class MapComponent implements OnInit, AfterViewInit {
   constructor(private http: HttpClient) {}
 
   ngOnInit(): void {
-    this.http.get(this.tileDataUrl).subscribe((data: any) => {
-      this.data = data;
-    });
+    mapboxgl.accessToken =
+      'pk.eyJ1Ijoic2VyZ2lpbGl1ayIsImEiOiJjbGxiYnpjM3owN2RkM2hxdWg3OXN2cWd5In0.XSTip8TBnC04m5ujxMKmYw';
   }
 
   ngAfterViewInit() {
-    this.initializeMap();
+    this.http.get(this.tileDataUrl).subscribe((data: any) => {
+      this.initializeMap(data);
+    });
   }
 
-  initializeMap(): void {
+  initializeMap(data: any): void {
     if (this.mapContainer) {
-      this.map = new Map({
+      this.map = new mapboxgl.Map({
         container: this.mapContainer.nativeElement,
         style: this.mapStyle,
-        center: [-74.5, 40],
-        zoom: 9,
+        center: [data.center[0], data.center[1]],
+        zoom: data.center[2],
+        bounds: data.bounds, // Set the initial view bounds
+        fitBoundsOptions: { padding: 20 }, // Adjust padding as needed
+        maxBounds: data.bounds, // Restrict panning outside these bounds
       });
 
       this.map.on('load', () => {
-        this.data.tiles.forEach((tileUrl: string) => {
+        data.tiles.forEach((tileUrl: string) => {
           this.map.addSource(tileUrl, {
             type: 'raster',
             tiles: [tileUrl],
@@ -62,48 +72,66 @@ export class MapComponent implements OnInit, AfterViewInit {
             paint: {},
           });
         });
-      });
+        // Add the Draw control
+        const draw = new MapboxDraw({
+          displayControlsDefault: false,
+          controls: {
+            polygon: true,
+            trash: true,
+          },
+          // styles: [
+          //   // Style for the polygon fill
+          //   {
+          //     id: 'gl-draw-polygon-fill',
+          //     type: 'fill',
+          //     paint: {
+          //       'fill-color': '#00FF00',
+          //       'fill-opacity': 0.3,
+          //     },
+          //   },
+          //   // Style for the polygon outline
+          //   {
+          //     id: 'gl-draw-polygon-stroke',
+          //     type: 'line',
+          //     paint: {
+          //       'line-color': '#00FF00',
+          //       'line-width': 2,
+          //     },
+          //   },
+          //   // Add more styles as needed for other draw modes
+          // ],
+          defaultMode: 'draw_polygon',
+        });
+        // @ts-ignore
+        this.map.addControl(draw, 'top-right');
 
-      // Log any map errors
-      this.map.on('error', (error) => {
-        console.error('Map Error:', error);
+        this.map.on('draw.create', handleSelectArea);
+        this.map.on('draw.delete', handleSelectArea);
+        this.map.on('draw.update', handleSelectArea);
+        // Log any map errors
+        this.map.on('error', (error) => {
+          console.error('Map Error:', error);
+        });
+
+        function handleSelectArea(e: any): void {
+          console.log('click');
+
+          const data = draw.getAll();
+
+          if (data.features.length > 0) {
+            const area = turf.area(data);
+            // Restrict the area to 2 decimal points.
+            const rounded_area = Math.round(area * 100) / 100;
+            console.log('res: ', rounded_area);
+          } else {
+            if (e.type !== 'draw.delete')
+              alert('Click the map to draw a polygon.');
+          }
+        }
       });
     }
   }
 
-  // ngAfterViewInit() {
-  //   this.http.get(this.tileDataUrl).subscribe((data: any) => {
-  //     this.configureMapLayers(data);
-  //   });
-  // }
-  // configureMapLayers(data: any): void {
-  //   console.log('op: ', data);
-
-  //   const initialState = { lng: 139.753, lat: 35.6844, zoom: 14 };
-
-  //   this.map = new Map({
-  //     container: this.mapContainer.nativeElement,
-  //     style: `https://api.maptiler.com/maps/satellite/style.json?key=meIz87U0Ci2zKW6N0Saq`,
-  //     center: [initialState.lng, initialState.lat],
-  //     zoom: initialState.zoom,
-  //   });
-
-  //   data.tiles.forEach((layer: any) => {
-  //     this.map.addLayer({
-  //       id: layer.id,
-  //       type: 'raster',
-  //       source: {
-  //         type: 'raster',
-  //         tiles: [layer.tiles],
-  //         tileSize: 256,
-  //       },
-  //     });
-  //   });
-  //   this.map.addControl(new NavigationControl(), 'top-right');
-  //   new Marker({ color: '#FF0000' })
-  //     .setLngLat([139.7525, 35.6846])
-  //     .addTo(this.map);
-  // }
   ngOnDestroy() {
     this.map?.remove();
   }
