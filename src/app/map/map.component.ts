@@ -6,11 +6,11 @@ import {
   AfterViewInit,
   OnDestroy,
 } from '@angular/core';
-import { Map, NavigationControl, Marker } from 'mapbox-gl';
-import mapboxgl from 'mapbox-gl';
+import mapboxgl, { Map, NavigationControl, Marker } from 'mapbox-gl';
 import { HttpClient } from '@angular/common/http';
 import * as turf from '@turf/turf';
 import * as MapboxDraw from '@mapbox/mapbox-gl-draw';
+import { Map as MapLibreGl } from 'maplibre-gl';
 
 @Component({
   selector: 'app-map',
@@ -20,6 +20,7 @@ import * as MapboxDraw from '@mapbox/mapbox-gl-draw';
 export class MapComponent implements OnInit, AfterViewInit {
   @ViewChild('mapContainer') mapContainer!: ElementRef;
   map: mapboxgl.Map | undefined;
+  mapLb: MapLibreGl | undefined;
   draw: any;
   selectedFeatures: turf.AllGeoJSON = turf.featureCollection([]);
 
@@ -47,7 +48,7 @@ export class MapComponent implements OnInit, AfterViewInit {
 
   initializeMap(data: any): void {
     if (this.mapContainer) {
-      this.map = new mapboxgl.Map({
+      this.mapLb = new MapLibreGl({
         container: this.mapContainer.nativeElement,
         style: this.mapStyle,
         center: [data.center[0], data.center[1]],
@@ -57,15 +58,15 @@ export class MapComponent implements OnInit, AfterViewInit {
         maxBounds: data.bounds, // Restrict panning outside these bounds
       });
 
-      this.map.on('load', () => {
+      this.mapLb.on('load', () => {
         data.tiles.forEach((tileUrl: string) => {
-          this.map.addSource(tileUrl, {
+          this.mapLb.addSource(tileUrl, {
             type: 'raster',
             tiles: [tileUrl],
             tileSize: 256,
           });
 
-          this.map.addLayer({
+          this.mapLb.addLayer({
             id: tileUrl,
             type: 'raster',
             source: tileUrl,
@@ -103,13 +104,13 @@ export class MapComponent implements OnInit, AfterViewInit {
           defaultMode: 'draw_polygon',
         });
         // @ts-ignore
-        this.map.addControl(draw, 'top-right');
+        this.mapLb.addControl(draw, 'top-right');
 
-        this.map.on('draw.create', handleSelectArea);
-        this.map.on('draw.delete', handleSelectArea);
-        this.map.on('draw.update', handleSelectArea);
+        this.mapLb.on('draw.create', handleSelectArea);
+        this.mapLb.on('draw.delete', handleSelectArea);
+        this.mapLb.on('draw.update', handleSelectArea);
         // Log any map errors
-        this.map.on('error', (error) => {
+        this.mapLb.on('error', (error) => {
           console.error('Map Error:', error);
         });
 
@@ -133,6 +134,6 @@ export class MapComponent implements OnInit, AfterViewInit {
   }
 
   ngOnDestroy() {
-    this.map?.remove();
+    this.mapLb?.remove();
   }
 }
